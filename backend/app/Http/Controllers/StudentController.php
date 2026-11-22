@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
+
+use Cloudinary\Cloudinary;
 use Illuminate\Http\Request;
 use App\Models\Student;
 
@@ -14,16 +16,35 @@ class StudentController extends Controller
 
     public function store(Request $request)
     {
-        request()->validate([
+        $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'apellido' => 'required|string|max:255',
             'fechaNacimiento' => 'required|date',
             'expediente' => 'required|string|max:20|unique:students,expediente',
-            'fotografia' => 'nullable|string|max:255',
+            'fotografia' => 'nullable|image|max:2048',
             'module_id' => 'required|exists:modules,id',
         ]);
 
-        $student = Student::create($request->all());
+        $file = $request->file('fotografia');
+        unset($validated['fotografia']);
+
+        if ($file) {
+            $cloudinary = new Cloudinary([
+                'cloud' => [
+                    'cloud_name' => config('services.cloudinary.cloud_name'),
+                    'api_key' => config('services.cloudinary.api_key'),
+                    'api_secret' => config('services.cloudinary.api_secret'),
+                ],
+            ]);
+
+            $upload = $cloudinary->uploadApi()->upload(
+                $file->getRealPath(),
+                ['folder' => 'students']
+            );
+            $validated['fotografia'] = $upload['secure_url'];
+        }
+
+        $student = Student::create($validated);
         return response()->json($student, 201);
     }
 
@@ -43,16 +64,35 @@ class StudentController extends Controller
             return response()->json(['mensaje' => 'estudiante no encontrado'], 404);
         }
 
-        request()->validate([
+        $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'apellido' => 'required|string|max:255',
             'fechaNacimiento' => 'required|date',
             'expediente' => 'required|string|max:20|unique:students,expediente,' . $id,
-            'fotografia' => 'nullable|string|max:255',
+            'fotografia' => 'nullable|image|max:2048',
             'module_id' => 'required|exists:modules,id',
         ]);
 
-        $student->update($request->all());
+        $file = $request->file('fotografia');
+        unset($validated['fotografia']);
+
+        if ($file) {
+            $cloudinary = new Cloudinary([
+                'cloud' => [
+                    'cloud_name' => config('services.cloudinary.cloud_name'),
+                    'api_key' => config('services.cloudinary.api_key'),
+                    'api_secret' => config('services.cloudinary.api_secret'),
+                ],
+            ]);
+
+            $upload = $cloudinary->uploadApi()->upload(
+                $file->getRealPath(),
+                ['folder' => 'students']
+            );
+            $validated['fotografia'] = $upload['secure_url'];
+        }
+
+        $student->update($validated);
         return response()->json($student, 200);
     }
 
